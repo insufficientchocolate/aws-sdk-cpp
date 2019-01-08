@@ -1,9 +1,4 @@
-if(GIT_FOUND)
-    execute_process(COMMAND ${GIT_EXECUTABLE} --git-dir=${CMAKE_CURRENT_SOURCE_DIR}/.git describe --abbrev=0 --tags
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE VERSION_STRING
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif()
+
 
 if(NOT VERSION_STRING)
     if(PACKAGE_VERSION) # set by AWSSDKConfigVersion when using find_package(AWSSDK)
@@ -15,7 +10,7 @@ if(NOT VERSION_STRING)
     endif(PACKAGE_VERSION)
 endif()
 
-set(PROJECT_VERSION "${VERSION_STRING}")
+set(PROJECT_VERSION "1.7.29")
 
 message(STATUS "Building project version: ${PROJECT_VERSION}")
 
