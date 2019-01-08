@@ -114,7 +114,6 @@ endif()
 
 include(initialize_project_version)
 
-hunter_add_package(aws-c-common)
 # build third-party targets
 # if (BUILD_DEPS)
 #     # If building third party dependencies, we will move them to the same directory where SDK has been installed during installation.
