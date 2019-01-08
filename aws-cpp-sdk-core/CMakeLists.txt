@@ -417,7 +417,7 @@ endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PLATFORM_DEP_LIBS} ${CLIENT_LIBS} ${CRYPTO_LIBS} ${AWS_SDK_ADDITIONAL_LIBRARIES})
 
-find_package(aws-c-event-stream REQUIRED)
+find_package(aws-c-event-stream CONFIG REQUIRED)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC AWS::aws-c-event-stream)
 

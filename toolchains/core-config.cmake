@@ -1,3 +1,3 @@
 include(CMakeFindDependencyMacro)
-find_dependency(aws-c-event-stream)
+find_package(aws-c-event-stream CONFIG REQUIRED)
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@-targets.cmake")

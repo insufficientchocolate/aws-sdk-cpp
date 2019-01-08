@@ -13,7 +13,7 @@
 # permissions and limitations under the License.
 #
 
-cmake_minimum_required (VERSION 3.1)
+cmake_minimum_required (VERSION 3.2)
 if(POLICY CMP0028)
     cmake_policy(SET CMP0028 NEW)
 endif()
@@ -27,6 +27,14 @@ if(POLICY CMP0056)
     cmake_policy(SET CMP0056 NEW)
 endif()
 
+include(cmake/HunterGate.cmake)
+
+HunterGate(
+    URL "https://github.com/ruslo/hunter/archive/v0.23.83.tar.gz"
+    SHA1 "12dec078717539eb7b03e6d2a17797cba9be9ba9"
+    LOCAL
+)
+
 # 3.0 or higher is strongly suggested; build settings (target_compile_options/etc...) sometimes do not get propagated properly under certain conditions prior to this version
 # Making this a hard requirement is potentially disruptive to existing customers who aren't affected by the bad behavior though, so just warn for now
 if(CMAKE_MAJOR_VERSION LESS 3)
@@ -36,7 +44,7 @@ endif()
 get_filename_component(AWS_NATIVE_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
 # git is required for Android builds and building third-party dependencies
-find_package(Git)
+#find_package(Git)
 
 # Cmake invocation variables:
 #   CUSTOM_MEMORY_MANAGEMENT - if set to 1, generates the sdk project files with custom memory management enabled, otherwise disables it
@@ -52,8 +60,8 @@ find_package(Git)
 # TODO: convert boolean invocation variables to options
 option(ENABLE_UNITY_BUILD "If enabled, the SDK will be built using a single unified .cpp file for each service library.  Reduces the size of static library binaries on Windows and Linux" OFF)
 option(MINIMIZE_SIZE "If enabled, the SDK will be built via a unity aggregation process that results in smaller static libraries; additionally, release binaries will favor size optimizations over speed" OFF)
-option(BUILD_SHARED_LIBS "If enabled, all aws sdk libraries will be build as shared objects; otherwise all Aws libraries will be built as static objects" ON)
-option(FORCE_SHARED_CRT "If enabled, will unconditionally link the standard libraries in dynamically, otherwise the standard library will be linked in based on the BUILD_SHARED_LIBS setting" ON)
+#option(BUILD_SHARED_LIBS "If enabled, all aws sdk libraries will be build as shared objects; otherwise all Aws libraries will be built as static objects" ON)
+option(FORCE_SHARED_CRT "If enabled, will unconditionally link the standard libraries in dynamically, otherwise the standard library will be linked in based on the BUILD_SHARED_LIBS setting" OFF)
 option(DISABLE_ANDROID_STANDALONE_BUILD "If enabled, the android build will not attempt to generate a standalone toolchain and instead rely on externally passed cmake parameters to specify the complete build environment.  The included toolchain file is still used." OFF)
 option(SIMPLE_INSTALL "If enabled, removes all the additional indirection (platform/cpu/config) in the bin and lib directories on the install step" ON)
 option(NO_HTTP_CLIENT "If enabled, no platform-default http client will be included in the library.  For the library to be used you will need to provide your own platform-specific implementation" OFF)
@@ -68,16 +76,16 @@ option(ANDROID_BUILD_ZLIB "When building for Android, should Zlib be built as we
 option(FORCE_CURL "Forces usage of the Curl client rather than the default OS-specific api" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Flags to enable/disable Address Sanitizer for gcc or clang" OFF)
 option(BYPASS_DEFAULT_PROXY "Bypass the machine's default proxy settings when using IXmlHttpRequest2" ON)
-option(BUILD_DEPS "Build third-party dependencies" ON)
+#option(BUILD_DEPS "Build third-party dependencies" ON)
 
 
 set(BUILD_ONLY "" CACHE STRING "A semi-colon delimited list of the projects to build")
 set(CPP_STANDARD "11" CACHE STRING "Flag to upgrade the C++ standard used. The default is 11. The minimum is 11.")
 
 # backwards compatibility with old command line params
-if("${STATIC_LINKING}" STREQUAL "1")
-    set(BUILD_SHARED_LIBS OFF)
-endif()
+# if("${STATIC_LINKING}" STREQUAL "1")
+#     set(BUILD_SHARED_LIBS OFF)
+# endif()
 
 if(MINIMIZE_SIZE)
     message(STATUS "MINIMIZE_SIZE enabled")
@@ -106,69 +114,72 @@ endif()
 
 include(initialize_project_version)
 
-
+hunter_add_package(aws-c-common)
 # build third-party targets
-if (BUILD_DEPS)
-    # If building third party dependencies, we will move them to the same directory where SDK has been installed during installation.
-    # Therefore, we should set rpath to $ORIGIN to let SDK find these third party dependencies.
-    # Otherwise, customers are responsible for handling the linkage to these libraries.
-    set(CMAKE_INSTALL_RPATH "$ORIGIN")
-    set(AWS_DEPS_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/.deps)
-    if (DEFINED CMAKE_INSTALL_PREFIX)
-        set(AWS_DEPS_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
-    else()
-        set(AWS_DEPS_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/.deps/install)
-    endif()
-    file(MAKE_DIRECTORY ${AWS_DEPS_BUILD_DIR})
-    if(TARGET_ARCH STREQUAL "ANDROID")
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR}
-            -DTARGET_ARCH=${TARGET_ARCH}
-            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-            -DANDROID_NATIVE_API_LEVEL=${ANDROID_NATIVE_API_LEVEL}
-            -DANDROID_ABI=${ANDROID_ABI}
-            -DANDROID_TOOLCHAIN_NAME=${ANDROID_TOOLCHAIN_NAME}
-            -DANDROID_STANDALONE_TOOLCHAIN=${ANDROID_STANDALONE_TOOLCHAIN}
-            -DANDROID_STL=${ANDROID_STL}
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-            -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}
-            -DCMAKE_INSTALL_PREFIX=${AWS_DEPS_INSTALL_DIR}
-            -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/third-party
-            WORKING_DIRECTORY ${AWS_DEPS_BUILD_DIR}
-            RESULT_VARIABLE BUILD_3P_EXIT_CODE)
-    else()
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR}
-            -DTARGET_ARCH=${TARGET_ARCH}
-            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-            -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}
-            -DCMAKE_INSTALL_PREFIX=${AWS_DEPS_INSTALL_DIR}
-            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/bin
-            ${CMAKE_CURRENT_SOURCE_DIR}/third-party
-            WORKING_DIRECTORY ${AWS_DEPS_BUILD_DIR}
-            RESULT_VARIABLE BUILD_3P_EXIT_CODE)
-    endif()
+# if (BUILD_DEPS)
+#     # If building third party dependencies, we will move them to the same directory where SDK has been installed during installation.
+#     # Therefore, we should set rpath to $ORIGIN to let SDK find these third party dependencies.
+#     # Otherwise, customers are responsible for handling the linkage to these libraries.
+#     set(CMAKE_INSTALL_RPATH "$ORIGIN")
+#     set(AWS_DEPS_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/.deps)
+#     if (DEFINED CMAKE_INSTALL_PREFIX)
+#         set(AWS_DEPS_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
+#     else()
+#         set(AWS_DEPS_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/.deps/install)
+#     endif()
+#     file(MAKE_DIRECTORY ${AWS_DEPS_BUILD_DIR})
+#     if(TARGET_ARCH STREQUAL "ANDROID")
+#         execute_process(
+#             COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR}
+#             -DTARGET_ARCH=${TARGET_ARCH}
+#             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+#             -DANDROID_NATIVE_API_LEVEL=${ANDROID_NATIVE_API_LEVEL}
+#             -DANDROID_ABI=${ANDROID_ABI}
+#             -DANDROID_TOOLCHAIN_NAME=${ANDROID_TOOLCHAIN_NAME}
+#             -DANDROID_STANDALONE_TOOLCHAIN=${ANDROID_STANDALONE_TOOLCHAIN}
+#             -DANDROID_STL=${ANDROID_STL}
+#             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+#             -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}
+#             -DCMAKE_INSTALL_PREFIX=${AWS_DEPS_INSTALL_DIR}
+#             -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+#             ${CMAKE_CURRENT_SOURCE_DIR}/third-party
+#             WORKING_DIRECTORY ${AWS_DEPS_BUILD_DIR}
+#             RESULT_VARIABLE BUILD_3P_EXIT_CODE)
+#     else()
+#         execute_process(
+#             COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR}
+#             -DTARGET_ARCH=${TARGET_ARCH}
+#             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+#             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+#             -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}
+#             -DCMAKE_INSTALL_PREFIX=${AWS_DEPS_INSTALL_DIR}
+#             -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/bin
+#             ${CMAKE_CURRENT_SOURCE_DIR}/third-party
+#             WORKING_DIRECTORY ${AWS_DEPS_BUILD_DIR}
+#             RESULT_VARIABLE BUILD_3P_EXIT_CODE)
+#     endif()
 
-    if (NOT ${BUILD_3P_EXIT_CODE} EQUAL 0)
-        message(FATAL_ERROR "Failed to configure third-party libraries.")
-    endif()
-    execute_process(COMMAND ${CMAKE_COMMAND} --build ${AWS_DEPS_BUILD_DIR} --config ${CMAKE_BUILD_TYPE}
-        RESULT_VARIABLE BUILD_3P_EXIT_CODE)
+#     if (NOT ${BUILD_3P_EXIT_CODE} EQUAL 0)
+#         message(FATAL_ERROR "Failed to configure third-party libraries.")
+#     endif()
+#     execute_process(COMMAND ${CMAKE_COMMAND} --build ${AWS_DEPS_BUILD_DIR} --config ${CMAKE_BUILD_TYPE}
+#         RESULT_VARIABLE BUILD_3P_EXIT_CODE)
 
-    if (NOT ${BUILD_3P_EXIT_CODE} EQUAL 0)
-        message(FATAL_ERROR "Failed to build third-party libraries.")
-    endif()
-    message(STATUS "Third-party dependencies are installed at: ${AWS_DEPS_INSTALL_DIR}")
-    list(APPEND CMAKE_PREFIX_PATH "${AWS_DEPS_INSTALL_DIR}")
-endif()
+#     if (NOT ${BUILD_3P_EXIT_CODE} EQUAL 0)
+#         message(FATAL_ERROR "Failed to build third-party libraries.")
+#     endif()
+#     message(STATUS "Third-party dependencies are installed at: ${AWS_DEPS_INSTALL_DIR}")
+#     list(APPEND CMAKE_PREFIX_PATH "${AWS_DEPS_INSTALL_DIR}")
+# endif()
 
 # build the sdk targets
 project("aws-cpp-sdk-all" VERSION "${PROJECT_VERSION}" LANGUAGES CXX)
 
 # http client, encryption, zlib
-include(external_dependencies)
+#include(external_dependencies)
+hunter_add_package(CURL)
+hunter_add_package(ZLIB)
+hunter_add_package(OpenSSL)
 
 if(COMMAND apply_post_project_platform_settings)
     apply_post_project_platform_settings()
@@ -191,7 +202,11 @@ include(sdks)
 
 include(utilities)
 
-include(build_external)
+#include(build_external)
+hunter_add_package(aws-c-common)
+hunter_add_package(aws-checksums)
+hunter_add_package(aws-c-event-stream)
+
 
 if(ENABLE_BCRYPT_ENCRYPTION)
     set(CRYPTO_LIBS Bcrypt)
